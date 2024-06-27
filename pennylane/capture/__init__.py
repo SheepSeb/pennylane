@@ -133,6 +133,7 @@ from .primitives import (
     create_measurement_obs_primitive,
     create_measurement_wires_primitive,
     create_measurement_mcm_primitive,
+    apply,
 )
 from .bind_nested_plxpr import bind_nested_plxpr
 from .capture_qnode import qnode_call

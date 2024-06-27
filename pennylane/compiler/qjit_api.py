@@ -13,6 +13,8 @@
 # limitations under the License.
 """QJIT compatible quantum and compilation operations API"""
 
+import pennylane as qml
+
 from .compiler import (
     AvailableCompilers,
     CompileError,
@@ -462,6 +464,8 @@ def for_loop(lower_bound, upper_bound, step):
     >>> circuit(7, 1.6)
     (array(0.97926626), array(0.55395718))
     """
+    if qml.capture.enabled():
+        return qml.capture.for_loop(lower_bound, upper_bound, step)
 
     if active_jit := active_compiler():
         compilers = AvailableCompilers.names_entrypoints

@@ -19,7 +19,7 @@ import functools
 import os
 import types
 import warnings
-from typing import Sequence
+from typing import Callable, Optional, Sequence
 
 import pennylane as qml
 from pennylane.typing import ResultBatch
@@ -27,6 +27,37 @@ from pennylane.typing import ResultBatch
 
 class TransformError(Exception):
     """Raised when there is an error with the transform logic."""
+
+
+def _transform_plxpr():
+
+    import jax
+    from jax.tree_util import tree_flatten, tree_unflatten
+
+    from pennylane.capture.interpreters import ConvertToTape
+    from pennylane.capture.switches import disable, enable
+
+    def reapply(obj):
+        vals, structure = tree_flatten(obj)
+        return tree_unflatten(structure, vals)
+
+    def recapture_tape(tape):
+        for op in tape.operations:
+            reapply(op)
+        return [reapply(m) for m in tape.measurements]
+
+    def apply_transform(plxpr, transform, *targs, **tkwargs):
+        def f(*args):
+            disable()
+            tape = ConvertToTape()(plxpr.jaxpr, plxpr.consts, *args)
+            (new_tape,), _ = transform(tape, *targs, **tkwargs)
+            enable()
+
+            return recapture_tape(new_tape)
+
+        return jax.make_jaxpr(f)
+
+    return apply_transform
 
 
 class TransformDispatcher:
@@ -89,6 +120,9 @@ class TransformDispatcher:
             # assume the first argument passed to the transform
             # is the object we wish to transform
             obj, *targs = targs
+
+        if "ClosedJaxpr" == type(obj).__name__:
+            return _transform_plxpr()(obj, self, *targs, **tkwargs)
 
         if isinstance(obj, qml.tape.QuantumScript):
             if self._expand_transform:

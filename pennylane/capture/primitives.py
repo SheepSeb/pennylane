@@ -27,6 +27,34 @@ except ImportError:
     has_jax = False
 
 
+@lru_cache
+def _get_apply_p():
+    if not has_jax:  # pragma: no cover
+        raise ImportError("Jax is required for plxpr.")  # pragma: no cover
+
+    apply_p = jax.core.Primitive("apply")
+
+    @apply_p.def_impl
+    def _(obj):
+        return qml.pytrees.unflatten(*qml.pytrees.flatten(obj))
+
+    @apply_p.def_abstract_eval
+    def _(obj):
+        return obj
+
+    return apply_p
+
+
+def apply(obj, repeat: int = 2) -> None:
+    """
+    Repeat is used to make sure the input obj is not removed from the circuit via being a dropped variable.
+    """
+    out = obj
+    for _ in range(repeat):
+        out = _get_apply_p().bind(obj)
+    return out
+
+
 @lru_cache  # construct the first time lazily
 def _get_abstract_operator() -> type:
     """Create an AbstractOperator once in a way protected from lack of a jax install."""

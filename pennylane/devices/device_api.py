@@ -695,3 +695,6 @@ class Device(abc.ABC):
         Default behaviour assumes this to be ``True`` if :meth:`~.compute_vjp` is overridden.
         """
         return type(self).compute_vjp != Device.compute_vjp
+
+    def execute_plxpr(self, plxpr, *args) -> Result:
+        raise NotImplementedError

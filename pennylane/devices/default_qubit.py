@@ -47,6 +47,7 @@ from .preprocess import (
     validate_observables,
 )
 from .qubit.adjoint_jacobian import adjoint_jacobian, adjoint_jvp, adjoint_vjp
+from .qubit.plxpr import DefaultQubitInterpreter
 from .qubit.sampling import jax_random_split
 from .qubit.simulate import get_final_state, measure_final_state, simulate
 
@@ -857,6 +858,9 @@ class DefaultQubit(Device):
                 )
 
         return tuple(zip(*results))
+
+    def execute_plxpr(self, plxpr, *args) -> Result:
+        return DefaultQubitInterpreter(num_wires=len(self.wires))(plxpr.jaxpr, plxpr.consts, *args)
 
 
 def _simulate_wrapper(circuit, kwargs):
