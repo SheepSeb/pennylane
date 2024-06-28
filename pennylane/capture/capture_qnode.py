@@ -62,11 +62,7 @@ def _get_qnode_prim():
 
     @qnode_prim.def_impl
     def _(*args, qnode, shots, device, qnode_kwargs, qfunc_jaxpr):
-        def qfunc(*inner_args):
-            return jax.core.eval_jaxpr(qfunc_jaxpr.jaxpr, qfunc_jaxpr.consts, *inner_args)
-
-        qnode = qml.QNode(qfunc, device, **qnode_kwargs)
-        return qnode._impl_call(*args, shots=shots)  # pylint: disable=protected-access
+        return device.execute_plxpr(qfunc_jaxpr, *args)
 
     # pylint: disable=unused-argument
     @qnode_prim.def_abstract_eval

@@ -472,4 +472,6 @@ def for_loop(lower_bound, upper_bound, step):
         ops_loader = compilers[active_jit]["ops"].load()
         return ops_loader.for_loop(lower_bound, upper_bound, step)
 
-    raise CompileError("There is no active compiler package.")  # pragma: no cover
+    return qml.capture.for_loop(lower_bound, upper_bound, step)
+
+    # raise CompileError("There is no active compiler package.")  # pragma: no cover

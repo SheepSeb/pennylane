@@ -20,13 +20,15 @@ def reapply(obj):
 
 class PlxprInterpreter:
 
-    _env: Optional[dict] = None
-    _op_math_cache: Optional[dict] = None
+    _env = None
+    _op_math_cache = None
 
     def _read(self, var):
         """Extract the value corresponding to a variable."""
         if self._env is None:
             raise ValueError("_env not yet initialized.")
+        if isinstance(var, int):
+            return var
         return var.val if type(var) is jax.core.Literal else self._env[var]
 
     def setup(self):
@@ -60,10 +62,16 @@ class PlxprInterpreter:
         partial_call = partial(self, jaxpr, consts)
         return jax.make_jaxpr(partial_call)
 
-    def __call__(self, jaxpr, consts, *args):
-        self._env = {}
-        self._op_math_cache = {}
-        self.setup()
+    def handle_for_loop(self, x, start, stop, step, jaxpr, n_args, fn_kwargs):
+        x = self._read(x)
+        start = self._read(start)
+        stop = self._read(stop)
+        step = self._read(step)
+        for i in range(start, stop, step):
+            [x] = self._call_internals(jaxpr.jaxpr, jaxpr.consts, i, x)
+        return x
+
+    def _call_internals(self, jaxpr, consts, *args):
 
         for arg, invar in zip(args, jaxpr.invars):
             self._env[invar] = arg
@@ -72,12 +80,19 @@ class PlxprInterpreter:
 
         measurements = []
         for eqn in jaxpr.eqns:
+
             if isinstance(eqn.outvars[0].aval, AbstractOperator):
                 self.interpret_operation_eqn(eqn)
 
             elif isinstance(eqn.outvars[0].aval, AbstractMeasurement):
                 measurement = self.interpret_measurement_eqn(eqn)
                 measurements.append(measurement)
+                self._env[eqn.outvars[0]] = measurement
+            elif eqn.primitive.name == "for_loop":
+                outvals = self.handle_for_loop(*eqn.invars, **eqn.params)
+                outvals = [outvals]
+                for outvar, outval in zip(eqn.outvars, outvals):
+                    self._env[outvar] = outval
             else:
                 invals = [self._read(invar) for invar in eqn.invars]
                 outvals = eqn.primitive.bind(*invals, **eqn.params)
@@ -85,6 +100,14 @@ class PlxprInterpreter:
                     outvals = [outvals]
                 for outvar, outval in zip(eqn.outvars, outvals):
                     self._env[outvar] = outval
+        return [self._read(outvar) for outvar in jaxpr.outvars]
+
+    def __call__(self, jaxpr, consts, *args):
+        self._env = {}
+        self._op_math_cache = {}
+        self.setup()
+
+        measurements = self._call_internals(jaxpr, consts, *args)
 
         self.cleanup()
         # Read the final result of the Jaxpr from the environment

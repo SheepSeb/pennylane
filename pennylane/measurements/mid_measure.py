@@ -219,9 +219,7 @@ def measure(
     measurement_id = str(uuid.uuid4())[:8]
     mp = MidMeasureMP(wires=wire, reset=reset, postselect=postselect, id=measurement_id)
     if qml.capture.enabled():
-        raise NotImplementedError(
-            "Capture cannot currently handle classical output from mid circuit measurements."
-        )
+        return qml.capture.measure(mp, shots=1)
     return MeasurementValue([mp], processing_fn=lambda v: v)
 
 
