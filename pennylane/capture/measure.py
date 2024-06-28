@@ -12,31 +12,43 @@ def trivial_processing(results):
     return results
 
 
+def _get_shapes_for(*measurements, shots=None, num_device_wires=0):
+    if jax.config.jax_enable_x64:
+        dtype_map = {
+            float: jax.numpy.float64,
+            int: jax.numpy.int64,
+            complex: jax.numpy.complex128,
+        }
+    else:
+        dtype_map = {
+            float: jax.numpy.float32,
+            int: jax.numpy.int32,
+            complex: jax.numpy.complex64,
+        }
+
+    shapes = []
+    if not shots:
+        shots = [None]
+
+    for s in shots:
+        for m in measurements:
+            shape, dtype = m.abstract_eval(shots=s, num_device_wires=num_device_wires)
+            shapes.append(jax.core.ShapedArray(shape, dtype_map.get(dtype, dtype)))
+    return shapes
+
+
 @measure_prim.def_impl
 def _(*measurements, shots, num_device_wires):
     # depends on the jax interpreter
-    if not all(isinstance(m, qml.measurements.MidMeasureMP) for m in measurements):
-        raise NotImplementedError("requires an interpreter to perform a measurement.")
-    return qml.measurements.MeasurementValue(measurements, trivial_processing)
+    raise NotImplementedError("requires an interpreter to perform a measurement.")
 
 
 @measure_prim.def_abstract_eval
 def _(*measurements, shots, num_device_wires):
-
-    if not shots.has_partitioned_shots:
-        kwargs = {"shots": shots.total_shots, "num_device_wires": num_device_wires}
-        return tuple(m.abstract_eval(n_wires=m.n_wires, **kwargs) for m in measurements)
-    vals = []
-    for s in shots:
-        v = tuple(
-            m.abstract_eval(n_wires=m.n_wires, shots=s, num_device_wires=num_device_wires)
-            for m in measurements
-        )
-        vals.extend(v)
-    return vals
+    return _get_shapes_for(*measurements, shots=shots, num_device_wires=num_device_wires)
 
 
 def measure(*measurements, shots=None, num_device_wires=0):
     """Perform a measurement."""
     shots = qml.measurements.Shots(shots)
-    return measure_prim.bind(*measurements, shots=shots, num_device_wires=num_device_wires)
+    return measure_prim.bind(measurements[0], shots=shots, num_device_wires=num_device_wires)

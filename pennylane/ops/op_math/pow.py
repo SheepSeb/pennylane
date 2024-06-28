@@ -14,6 +14,8 @@
 """
 This submodule defines the symbolic operation that stands for the power of an operator.
 """
+
+import contextlib
 import copy
 from typing import Union
 
@@ -88,6 +90,8 @@ def pow(base, z=1, lazy=True, id=None):
     Lazy behaviour can also be accessed via ``op ** z``.
 
     """
+    if qml.capture.enabled():
+        return Pow(base, z, lazy=lazy)
     if lazy:
         return Pow(base, z, id=id)
     try:
@@ -412,3 +416,17 @@ class PowOpObs(PowOperation, Observable):
 
     def __new__(cls, *_, **__):
         return object.__new__(cls)
+
+
+PowOperation._primitive = Pow._primitive
+PowObs._primitive = Pow._primitive
+PowOpObs._primitive = Pow._primitive
+
+if Pow._primitive is not None:
+
+    @Pow._primitive.def_impl
+    def _(base, z, lazy=False):
+        if not lazy:
+            with contextlib.suppress(PowUndefinedError):
+                return base.pow(z)
+        return Pow(base, z)

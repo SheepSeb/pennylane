@@ -20,7 +20,7 @@ from typing import Callable
 import pennylane as qml
 from pennylane.compiler import compiler
 from pennylane.math import conj, moveaxis, transpose
-from pennylane.operation import Observable, Operation, Operator
+from pennylane.operation import AdjointUndefinedError, Observable, Operation, Operator
 from pennylane.queuing import QueuingManager
 from pennylane.tape import make_qscript
 
@@ -171,6 +171,8 @@ def adjoint(fn, lazy=True):
 def create_adjoint_op(fn, lazy):
     """Main logic for qml.adjoint, but allows bypassing the compiler dispatch if needed."""
     if isinstance(fn, Operator):
+        if qml.capture.enabled():
+            return Adjoint(fn, lazy=lazy)
         return Adjoint(fn) if lazy else _single_op_eager(fn, update_queue=True)
     if not callable(fn):
         raise ValueError(
@@ -442,3 +444,13 @@ class AdjointOpObs(AdjointOperation, Observable):
 
     def __new__(cls, *_, **__):
         return object.__new__(cls)
+
+
+AdjointObs._primitive = Adjoint._primitive
+AdjointOpObs._primitive = Adjoint._primitive
+
+if Adjoint._primitive is not None:
+
+    @Adjoint._primitive.def_impl
+    def _(op, lazy=False):
+        return op.adjoint() if not lazy and op.has_adjoint else Adjoint(op)

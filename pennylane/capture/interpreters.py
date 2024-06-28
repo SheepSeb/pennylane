@@ -20,8 +20,9 @@ def reapply(obj):
 
 class PlxprInterpreter:
 
-    _env = None
-    _op_math_cache = None
+    def __init__(self):
+        self._env = {}
+        self._op_math_cache = {}
 
     def _read(self, var):
         """Extract the value corresponding to a variable."""
@@ -93,6 +94,8 @@ class PlxprInterpreter:
                 outvals = [outvals]
                 for outvar, outval in zip(eqn.outvars, outvals):
                     self._env[outvar] = outval
+            elif eqn.primitive.name == "measure":
+                self._env[eqn.outvars[0]] = self._env[eqn.invars[0]]
             else:
                 invals = [self._read(invar) for invar in eqn.invars]
                 outvals = eqn.primitive.bind(*invals, **eqn.params)

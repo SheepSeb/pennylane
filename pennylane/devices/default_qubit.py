@@ -860,7 +860,9 @@ class DefaultQubit(Device):
         return tuple(zip(*results))
 
     def execute_plxpr(self, plxpr, *args) -> Result:
-        return DefaultQubitInterpreter(num_wires=len(self.wires))(plxpr.jaxpr, plxpr.consts, *args)
+        return DefaultQubitInterpreter(num_wires=len(self.wires), shots=self.shots)(
+            plxpr.jaxpr, plxpr.consts, *args
+        )
 
 
 def _simulate_wrapper(circuit, kwargs):

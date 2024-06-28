@@ -17,6 +17,7 @@ Contains the condition transform.
 from functools import wraps
 from typing import Type
 
+import pennylane as qml
 from pennylane import QueuingManager
 from pennylane.compiler import compiler
 from pennylane.operation import AnyWires, Operation, Operator
@@ -98,6 +99,15 @@ class Conditional(SymbolicOp, Operation):
 
     def adjoint(self):
         return Conditional(self.meas_val, self.base.adjoint())
+
+
+if Conditional._primitive is not None:
+
+    @Conditional._primitive.def_impl
+    def _(expr, then_op):
+        if expr:
+            return then_op
+        return qml.I(then_op.wires)
 
 
 def cond(condition, true_fn, false_fn=None, elifs=()):
