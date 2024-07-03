@@ -22,7 +22,7 @@ from autograd.extend import vspace
 from autograd.numpy.numpy_boxes import ArrayBox
 from autograd.wrap_util import unary_to_nary
 
-from pennylane.capture import bind_nested_plxpr
+from pennylane.capture import bind_nested_plxpr, enabled
 from pennylane.compiler import compiler
 from pennylane.compiler.compiler import CompileError
 
@@ -196,7 +196,12 @@ class _grad:
 
 @bind_nested_plxpr
 def grad(func, argnum=None, method=None, h=None):
-    return _grad(func, argnum=argnum, method=method, h=h)
+    if enabled():
+        import jax
+
+        argnums = argnum if argnum is not None else (0,)
+        return jax.grad(func, argnums=argnums)
+    return _grad(func, argnum=argnum)
 
 
 @bind_nested_plxpr
