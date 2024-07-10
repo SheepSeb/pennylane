@@ -117,7 +117,12 @@ class LegacyDeviceFacade(Device):
 
     # pylint: disable=super-init-not-called
     def __init__(self, device: "qml.devices.LegacyDevice"):
+        if not isinstance(device, qml.devices.LegacyDevice):
+            raise qml.DeviceError(f"LegacyDeviceFacade only accepts devices of type LegacyDevice.")
         self._device = device
+
+    def __eq__(self, other):
+        return getattr(other, "target_device", "") == self.target_device
 
     @property
     def tracker(self):
@@ -205,9 +210,6 @@ class LegacyDeviceFacade(Device):
                 updated_values["gradient_method"] = "backprop"
                 if execution_config.use_device_gradient is None:
                     updated_values["use_device_gradient"] = True
-            elif self._validate_adjoint_method(tape):
-                config = replace(execution_config, gradient_method="adjoint")
-                return self._setup_execution_config(config)
             elif self._validate_device_method(tape):
                 config = replace(execution_config, gradient_method="device")
                 return self._setup_execution_config(config)
@@ -219,7 +221,6 @@ class LegacyDeviceFacade(Device):
         if execution_config is None or execution_config.gradient_method == "best":
             validation_methods = (
                 self._validate_backprop_method,
-                self._validate_adjoint_method,
                 self._validate_device_method,
             )
             return any(validate(circuit) for validate in validation_methods)
@@ -265,7 +266,7 @@ class LegacyDeviceFacade(Device):
 
         new_device = qml.device(
             backprop_devices[mapped_interface], wires=self._device.wires, shots=self._device.shots
-        )
+        ).target_device
         new_device.expand_fn = expand_fn
         new_device.batch_transform = batch_transform
         new_device._debugger = debugger

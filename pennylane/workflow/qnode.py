@@ -623,6 +623,8 @@ class QNode:
             tuple[str or .TransformDispatcher, dict, .Device: Tuple containing the ``gradient_fn``,
             ``gradient_kwargs``, and the device to use when calling the execute function.
         """
+        if isinstance(device, qml.devices.LegacyDevice):
+            device = qml.devices.LegacyDeviceFacade(device)
 
         config = _make_execution_config(None, diff_method)
         if device.supports_derivatives(config, circuit=tape):
@@ -637,7 +639,9 @@ class QNode:
             return QNode.get_best_method(device, interface, tape=tape)
 
         if diff_method == "parameter-shift":
-            return QNode._validate_parameter_shift(device, tape=tape)
+            if tape and any(isinstance(o, qml.operation.CV) for o in tape):
+                return qml.gradients.param_shift_cv, {"dev": device}, device
+            return qml.gradients.param_shift, {}, device
 
         if diff_method == "finite-diff":
             return qml.gradients.finite_diff, {}, device
@@ -689,13 +693,18 @@ class QNode:
             tuple[str or .TransformDispatcher, dict, .Device: Tuple containing the ``gradient_fn``,
             ``gradient_kwargs``, and the device to use when calling the execute function.
         """
+        if isinstance(device, qml.devices.LegacyDevice):
+            device = qml.devices.LegacyDeviceFacade(device)
+
         config = _make_execution_config(None, "best")
 
         if device.supports_derivatives(config, circuit=tape):
             new_config = device.preprocess(config)[1]
             return new_config.gradient_method, {}, device
 
-        return QNode._validate_parameter_shift(device, tape=tape)
+        if tape and any(isinstance(o, qml.operation.CV) for o in tape):
+            return qml.gradients.param_shift_cv, {"dev": device}, device
+        return qml.gradients.param_shift, {}, device
 
     @staticmethod
     @debug_logger
@@ -725,6 +734,9 @@ class QNode:
         Returns:
             str: The gradient function to use in human-readable format.
         """
+        if isinstance(device, qml.devices.LegacyDevice):
+            device = qml.devices.LegacyDeviceFacade(device)
+
         transform = QNode.get_best_method(device, interface)[0]
 
         if transform is qml.gradients.finite_diff:
@@ -735,12 +747,6 @@ class QNode:
 
         # only other options at this point are "backprop" or "device"
         return transform
-
-    @staticmethod
-    def _validate_parameter_shift(device, tape=None):
-        if tape and any(isinstance(o, qml.operation.CV) for o in tape):
-            return qml.gradients.param_shift_cv, {"dev": device}, device
-        return qml.gradients.param_shift, {}, device
 
     @property
     def tape(self) -> QuantumTape:

@@ -352,7 +352,7 @@ def execute(
            [ 0.        ,  0.        , -0.95533649]])
     """
     if isinstance(device, qml.devices.LegacyDevice):
-        device = qml.deviecs.LegacyDeviceFacade(device)
+        device = qml.devices.LegacyDeviceFacade(device)
 
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug(
